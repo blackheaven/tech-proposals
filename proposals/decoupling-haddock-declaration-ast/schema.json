@@ -1,0 +1,1640 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Haddock IR",
+  "description": "Intermediate representation of Haskell documentation, decoupled from GHC",
+  "type": "object",
+  "properties": {
+    "version": {
+      "description": "Schema version of the IR (semver)",
+      "type": "string"
+    },
+    "ghcVersion": {
+      "description": "GHC version that produced this IR",
+      "type": "string"
+    },
+    "package": {
+      "$ref": "#/$defs/packageInfo"
+    },
+    "linkEnv": {
+      "description": "Map from qualified name to its preferred link-destination module",
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/moduleRef"
+      }
+    },
+    "modules": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/haddockModule"
+      }
+    }
+  },
+  "required": ["version", "ghcVersion", "modules"],
+  "additionalProperties": false,
+
+  "$defs": {
+
+    "packageInfo": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "version": { "type": "string" }
+      },
+      "required": ["name", "version"],
+      "additionalProperties": false
+    },
+
+    "moduleRef": {
+      "type": "object",
+      "properties": {
+        "package": { "type": "string" },
+        "module": { "type": "string" }
+      },
+      "required": ["package", "module"],
+      "additionalProperties": false
+    },
+
+    "nameRef": {
+      "description": "A fully-qualified name",
+      "type": "object",
+      "properties": {
+        "package": { "type": "string" },
+        "module": { "type": "string" },
+        "occurrence": { "type": "string" }
+      },
+      "required": ["package", "module", "occurrence"],
+      "additionalProperties": false
+    },
+
+    "wrapName": {
+      "description": "A name with rendering decoration",
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "tag": { "const": "Unadorned" },
+            "name": { "$ref": "#/$defs/nameRef" }
+          },
+          "required": ["tag", "name"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "tag": { "const": "Parenthesized" },
+            "name": { "$ref": "#/$defs/nameRef" }
+          },
+          "required": ["tag", "name"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "tag": { "const": "Backticked" },
+            "name": { "$ref": "#/$defs/nameRef" }
+          },
+          "required": ["tag", "name"],
+          "additionalProperties": false
+        }
+      ]
+    },
+
+    "haddockModule": {
+      "type": "object",
+      "properties": {
+        "module": { "$ref": "#/$defs/moduleRef" },
+        "isSignature": { "type": "boolean" },
+        "description": {
+          "description": "Module-level documentation",
+          "$ref": "#/$defs/documentation"
+        },
+        "info": { "$ref": "#/$defs/haddockModInfo" },
+        "exports": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/haddockExport" }
+        },
+        "exportedNames": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/nameRef" }
+        },
+        "visibleNames": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/nameRef" }
+        },
+        "instances": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/docInstance" }
+        },
+        "fixities": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": { "$ref": "#/$defs/nameRef" },
+              "fixity": { "$ref": "#/$defs/fixity" }
+            },
+            "required": ["name", "fixity"],
+            "additionalProperties": false
+          }
+        },
+        "warnings": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": { "$ref": "#/$defs/nameRef" },
+              "doc": { "$ref": "#/$defs/doc" }
+            },
+            "required": ["name", "doc"],
+            "additionalProperties": false
+          }
+        },
+        "options": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "Hide",
+              "Prune",
+              "IgnoreExports",
+              "NotHome",
+              "ShowExtensions",
+              "PrintRuntimeRep"
+            ]
+          }
+        }
+      },
+      "required": ["module", "isSignature", "exports"],
+      "additionalProperties": false
+    },
+
+    "haddockModInfo": {
+      "type": "object",
+      "properties": {
+        "description": { "$ref": "#/$defs/doc" },
+        "language": { "type": ["string", "null"] },
+        "extensions": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "additionalProperties": false
+    },
+
+    "haddockExport": {
+      "oneOf": [
+        {
+          "type": "object",
+          "description": "An exported declaration with documentation, instances, and fixities",
+          "properties": {
+            "tag": { "const": "ExportDecl" },
+            "decl": { "$ref": "#/$defs/haddockDecl" },
+            "doc": { "$ref": "#/$defs/docForDecl" },
+            "subDocs": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": { "$ref": "#/$defs/nameRef" },
+                  "doc": { "$ref": "#/$defs/docForDecl" }
+                },
+                "required": ["name", "doc"],
+                "additionalProperties": false
+              }
+            },
+            "instances": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/docInstance" }
+            },
+            "fixities": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": { "$ref": "#/$defs/nameRef" },
+                  "fixity": { "$ref": "#/$defs/fixity" }
+                },
+                "required": ["name", "fixity"],
+                "additionalProperties": false
+              }
+            },
+            "splice": { "type": "boolean" }
+          },
+          "required": ["tag", "decl"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "description": "An exported name without a corresponding declaration",
+          "properties": {
+            "tag": { "const": "ExportNoDecl" },
+            "name": { "$ref": "#/$defs/nameRef" },
+            "subnames": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/nameRef" }
+            },
+            "doc": { "$ref": "#/$defs/docForDecl" }
+          },
+          "required": ["tag", "name"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "description": "A section heading",
+          "properties": {
+            "tag": { "const": "ExportGroup" },
+            "level": { "type": "integer" },
+            "title": { "type": "string" },
+            "doc": { "$ref": "#/$defs/doc" }
+          },
+          "required": ["tag", "level", "title"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "description": "Standalone documentation",
+          "properties": {
+            "tag": { "const": "ExportDoc" },
+            "doc": { "$ref": "#/$defs/mDoc" }
+          },
+          "required": ["tag", "doc"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "description": "A module re-export",
+          "properties": {
+            "tag": { "const": "ExportModule" },
+            "module": { "$ref": "#/$defs/moduleRef" }
+          },
+          "required": ["tag", "module"],
+          "additionalProperties": false
+        }
+      ]
+    },
+
+    "haddockDecl": {
+      "oneOf": [
+        {
+          "type": "object",
+          "description": "Type/class/family declaration",
+          "properties": {
+            "tag": { "const": "TyClD" },
+            "decl": { "$ref": "#/$defs/tyClDecl" }
+          },
+          "required": ["tag", "decl"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "description": "Signature declaration",
+          "properties": {
+            "tag": { "const": "SigD" },
+            "sig": { "$ref": "#/$defs/sigDecl" }
+          },
+          "required": ["tag", "sig"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "description": "Foreign declaration",
+          "properties": {
+            "tag": { "const": "ForD" },
+            "decl": { "$ref": "#/$defs/foreignDecl" }
+          },
+          "required": ["tag", "decl"],
+          "additionalProperties": false
+        }
+      ]
+    },
+
+    "tyClDecl": {
+      "oneOf": [
+        {
+          "type": "object",
+          "description": "Type or data family",
+          "properties": {
+            "tag": { "const": "FamDecl" },
+            "decl": { "$ref": "#/$defs/familyDecl" }
+          },
+          "required": ["tag", "decl"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "description": "Type synonym",
+          "properties": {
+            "tag": { "const": "SynDecl" },
+            "name": { "$ref": "#/$defs/nameRef" },
+            "tyVars": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/tyVarBndr" }
+            },
+            "fixity": { "$ref": "#/$defs/fixity" },
+            "rhs": { "$ref": "#/$defs/hsType" }
+          },
+          "required": ["tag", "name", "tyVars", "rhs"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "description": "Data or newtype",
+          "properties": {
+            "tag": { "const": "DataDecl" },
+            "name": { "$ref": "#/$defs/nameRef" },
+            "tyVars": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/tyVarBndr" }
+            },
+            "fixity": { "$ref": "#/$defs/fixity" },
+            "context": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/hsType" }
+            },
+            "kindSig": {
+              "oneOf": [
+                { "$ref": "#/$defs/hsType" },
+                { "type": "null" }
+              ]
+            },
+            "constructors": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/conDecl" }
+            },
+            "isNewType": { "type": "boolean" }
+          },
+          "required": ["tag", "name", "tyVars", "constructors", "isNewType"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "description": "Type class",
+          "properties": {
+            "tag": { "const": "ClassDecl" },
+            "context": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/hsType" }
+            },
+            "name": { "$ref": "#/$defs/nameRef" },
+            "tyVars": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/tyVarBndr" }
+            },
+            "fundeps": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "lhs": {
+                    "type": "array",
+                    "items": { "$ref": "#/$defs/nameRef" }
+                  },
+                  "rhs": {
+                    "type": "array",
+                    "items": { "$ref": "#/$defs/nameRef" }
+                  }
+                },
+                "required": ["lhs", "rhs"],
+                "additionalProperties": false
+              }
+            },
+            "sigs": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/sigDecl" }
+            },
+            "associatedTypes": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/familyDecl" }
+            },
+            "associatedTypeDefaults": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/tyFamInstEqn" }
+            },
+            "minimalComplete": {
+              "oneOf": [
+                { "$ref": "#/$defs/booleanFormula" },
+                { "type": "null" }
+              ]
+            },
+            "fixity": { "$ref": "#/$defs/fixity" }
+          },
+          "required": ["tag", "name", "tyVars"],
+          "additionalProperties": false
+        }
+      ]
+    },
+
+    "familyDecl": {
+      "type": "object",
+      "properties": {
+        "info": {
+          "type": "string",
+          "enum": ["OpenTypeFamily", "ClosedTypeFamily", "DataFamily"]
+        },
+        "name": { "$ref": "#/$defs/nameRef" },
+        "tyVars": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/tyVarBndr" }
+        },
+        "resultSig": {
+          "oneOf": [
+            { "type": "string", "const": "NoSig" },
+            {
+              "type": "object",
+              "properties": {
+                "tag": { "const": "KindSig" },
+                "kind": { "$ref": "#/$defs/hsType" }
+              },
+              "required": ["tag", "kind"],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "tag": { "const": "TyVarSig" },
+                "bndr": { "$ref": "#/$defs/tyVarBndr" }
+              },
+              "required": ["tag", "bndr"],
+              "additionalProperties": false
+            }
+          ]
+        },
+        "injectivityAnn": {
+          "oneOf": [
+            {
+              "type": "object",
+              "properties": {
+                "lhs": { "$ref": "#/$defs/nameRef" },
+                "rhs": {
+                  "type": "array",
+                  "items": { "$ref": "#/$defs/nameRef" }
+                }
+              },
+              "required": ["lhs", "rhs"],
+              "additionalProperties": false
+            },
+            { "type": "null" }
+          ]
+        },
+        "equations": {
+          "description": "For closed type families only",
+          "type": ["array", "null"],
+          "items": { "$ref": "#/$defs/tyFamInstEqn" }
+        }
+      },
+      "required": ["info", "name"],
+      "additionalProperties": false
+    },
+
+    "sigDecl": {
+      "oneOf": [
+        {
+          "type": "object",
+          "description": "Function type signature",
+          "properties": {
+            "tag": { "const": "TypeSig" },
+            "names": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/nameRef" }
+            },
+            "type": { "$ref": "#/$defs/hsSigType" }
+          },
+          "required": ["tag", "names", "type"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "description": "Pattern synonym signature",
+          "properties": {
+            "tag": { "const": "PatSynSig" },
+            "names": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/nameRef" }
+            },
+            "type": { "$ref": "#/$defs/hsSigType" }
+          },
+          "required": ["tag", "names", "type"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "description": "Class method signature",
+          "properties": {
+            "tag": { "const": "ClassOpSig" },
+            "isDefault": { "type": "boolean" },
+            "names": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/nameRef" }
+            },
+            "type": { "$ref": "#/$defs/hsSigType" }
+          },
+          "required": ["tag", "isDefault", "names", "type"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "description": "Minimal complete definition",
+          "properties": {
+            "tag": { "const": "MinimalSig" },
+            "formula": { "$ref": "#/$defs/booleanFormula" }
+          },
+          "required": ["tag", "formula"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "description": "Fixity declaration",
+          "properties": {
+            "tag": { "const": "FixSig" },
+            "name": { "$ref": "#/$defs/nameRef" },
+            "fixity": { "$ref": "#/$defs/fixity" }
+          },
+          "required": ["tag", "name", "fixity"],
+          "additionalProperties": false
+        }
+      ]
+    },
+
+    "foreignDecl": {
+      "oneOf": [
+        {
+          "type": "object",
+          "description": "Foreign import",
+          "properties": {
+            "tag": { "const": "ForeignImport" },
+            "name": { "$ref": "#/$defs/nameRef" },
+            "type": { "$ref": "#/$defs/hsSigType" }
+          },
+          "required": ["tag", "name", "type"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "description": "Foreign export",
+          "properties": {
+            "tag": { "const": "ForeignExport" },
+            "name": { "$ref": "#/$defs/nameRef" },
+            "type": { "$ref": "#/$defs/hsSigType" }
+          },
+          "required": ["tag", "name", "type"],
+          "additionalProperties": false
+        }
+      ]
+    },
+
+    "conDecl": {
+      "oneOf": [
+        {
+          "type": "object",
+          "description": "Haskell 98 constructor",
+          "properties": {
+            "tag": { "const": "ConDeclH98" },
+            "name": { "$ref": "#/$defs/nameRef" },
+            "forall": { "type": "boolean" },
+            "tyVars": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/tyVarBndr" }
+            },
+            "context": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/hsType" }
+            },
+            "details": { "$ref": "#/$defs/conDeclH98Details" },
+            "doc": {
+              "oneOf": [
+                { "$ref": "#/$defs/mDoc" },
+                { "type": "null" }
+              ]
+            }
+          },
+          "required": ["tag", "name", "forall", "details"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "description": "GADT constructor",
+          "properties": {
+            "tag": { "const": "ConDeclGADT" },
+            "names": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/nameRef" }
+            },
+            "tyVars": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/tyVarBndr" }
+            },
+            "context": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/hsType" }
+            },
+            "details": { "$ref": "#/$defs/conDeclGADTDetails" },
+            "resultType": { "$ref": "#/$defs/hsType" },
+            "doc": {
+              "oneOf": [
+                { "$ref": "#/$defs/mDoc" },
+                { "type": "null" }
+              ]
+            }
+          },
+          "required": ["tag", "names", "details", "resultType"],
+          "additionalProperties": false
+        }
+      ]
+    },
+
+    "conDeclH98Details": {
+      "oneOf": [
+        {
+          "type": "object",
+          "description": "Prefix constructor",
+          "properties": {
+            "tag": { "const": "PrefixCon" },
+            "args": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "argType": { "$ref": "#/$defs/hsType" },
+                  "strictness": {
+                    "type": ["string", "null"],
+                    "enum": ["SrcStrict", "SrcLazy", null]
+                  }
+                },
+                "required": ["argType"],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": ["tag", "args"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "description": "Record constructor",
+          "properties": {
+            "tag": { "const": "RecCon" },
+            "fields": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/conDeclField" }
+            }
+          },
+          "required": ["tag", "fields"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "description": "Infix constructor",
+          "properties": {
+            "tag": { "const": "InfixCon" },
+            "leftArg": { "$ref": "#/$defs/hsType" },
+            "rightArg": { "$ref": "#/$defs/hsType" }
+          },
+          "required": ["tag", "leftArg", "rightArg"],
+          "additionalProperties": false
+        }
+      ]
+    },
+
+    "conDeclGADTDetails": {
+      "oneOf": [
+        {
+          "type": "object",
+          "description": "GADT prefix constructor",
+          "properties": {
+            "tag": { "const": "PrefixConGADT" },
+            "args": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "argType": { "$ref": "#/$defs/hsType" },
+                  "strictness": {
+                    "type": ["string", "null"],
+                    "enum": ["SrcStrict", "SrcLazy", null]
+                  }
+                },
+                "required": ["argType"],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": ["tag", "args"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "description": "GADT record constructor",
+          "properties": {
+            "tag": { "const": "RecConGADT" },
+            "fields": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/conDeclField" }
+            }
+          },
+          "required": ["tag", "fields"],
+          "additionalProperties": false
+        }
+      ]
+    },
+
+    "conDeclField": {
+      "type": "object",
+      "description": "A record field",
+      "properties": {
+        "names": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/nameRef" }
+        },
+        "type": { "$ref": "#/$defs/hsType" },
+        "doc": {
+          "oneOf": [
+            { "$ref": "#/$defs/mDoc" },
+            { "type": "null" }
+          ]
+        },
+        "strictness": {
+          "type": ["string", "null"],
+          "enum": ["SrcStrict", "SrcLazy", null]
+        }
+      },
+      "required": ["names", "type"],
+      "additionalProperties": false
+    },
+
+    "hsSigType": {
+      "type": "object",
+      "description": "A type with outer type variable binders",
+      "properties": {
+        "tyVars": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/tyVarBndr" }
+        },
+        "body": { "$ref": "#/$defs/hsType" }
+      },
+      "required": ["tyVars", "body"],
+      "additionalProperties": false
+    },
+
+    "hsType": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "tag": { "const": "HsForAllTy" },
+            "tele": { "$ref": "#/$defs/hsForAllTelescope" },
+            "body": { "$ref": "#/$defs/hsType" }
+          },
+          "required": ["tag", "tele", "body"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "tag": { "const": "HsQualTy" },
+            "context": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/hsType" }
+            },
+            "body": { "$ref": "#/$defs/hsType" }
+          },
+          "required": ["tag", "body"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "tag": { "const": "HsFunTy" },
+            "multiplicity": {
+              "type": "string",
+              "enum": ["Unannotated", "Linear", "One", "Many"]
+            },
+            "arg": { "$ref": "#/$defs/hsType" },
+            "result": { "$ref": "#/$defs/hsType" }
+          },
+          "required": ["tag", "multiplicity", "arg", "result"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "tag": { "const": "HsTyVar" },
+            "promoted": { "type": "boolean" },
+            "name": { "$ref": "#/$defs/nameRef" }
+          },
+          "required": ["tag", "promoted", "name"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "tag": { "const": "HsAppTy" },
+            "fun": { "$ref": "#/$defs/hsType" },
+            "arg": { "$ref": "#/$defs/hsType" }
+          },
+          "required": ["tag", "fun", "arg"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "tag": { "const": "HsAppKindTy" },
+            "fun": { "$ref": "#/$defs/hsType" },
+            "kind": { "$ref": "#/$defs/hsType" }
+          },
+          "required": ["tag", "fun", "kind"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "tag": { "const": "HsOpTy" },
+            "promoted": { "type": "boolean" },
+            "left": { "$ref": "#/$defs/hsType" },
+            "operator": { "$ref": "#/$defs/nameRef" },
+            "right": { "$ref": "#/$defs/hsType" }
+          },
+          "required": ["tag", "promoted", "left", "operator", "right"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "tag": { "const": "HsParTy" },
+            "inner": { "$ref": "#/$defs/hsType" }
+          },
+          "required": ["tag", "inner"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "tag": { "const": "HsKindSig" },
+            "type": { "$ref": "#/$defs/hsType" },
+            "kind": { "$ref": "#/$defs/hsType" }
+          },
+          "required": ["tag", "type", "kind"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "tag": { "const": "HsListTy" },
+            "inner": { "$ref": "#/$defs/hsType" }
+          },
+          "required": ["tag", "inner"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "tag": { "const": "HsTupleTy" },
+            "sort": {
+              "type": "string",
+              "enum": ["Boxed", "Unboxed"]
+            },
+            "elements": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/hsType" }
+            }
+          },
+          "required": ["tag", "sort", "elements"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "tag": { "const": "HsSumTy" },
+            "elements": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/hsType" }
+            }
+          },
+          "required": ["tag", "elements"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "tag": { "const": "HsIParamTy" },
+            "name": { "type": "string" },
+            "type": { "$ref": "#/$defs/hsType" }
+          },
+          "required": ["tag", "name", "type"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "tag": { "const": "HsExplicitListTy" },
+            "promoted": { "type": "boolean" },
+            "elements": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/hsType" }
+            }
+          },
+          "required": ["tag", "promoted", "elements"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "tag": { "const": "HsExplicitTupleTy" },
+            "promoted": { "type": "boolean" },
+            "elements": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/hsType" }
+            }
+          },
+          "required": ["tag", "promoted", "elements"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "tag": { "const": "HsTyLit" },
+            "lit": { "$ref": "#/$defs/hsTyLit" }
+          },
+          "required": ["tag", "lit"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "tag": { "const": "HsWildCardTy" }
+          },
+          "required": ["tag"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "tag": { "const": "HsStarTy" },
+            "isUnicode": { "type": "boolean" }
+          },
+          "required": ["tag", "isUnicode"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "tag": { "const": "HsBangTy" },
+            "strictness": {
+              "type": "string",
+              "enum": ["SrcStrict", "SrcLazy"]
+            },
+            "inner": { "$ref": "#/$defs/hsType" }
+          },
+          "required": ["tag", "strictness", "inner"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "tag": { "const": "HsRecTy" },
+            "fields": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/conDeclField" }
+            }
+          },
+          "required": ["tag", "fields"],
+          "additionalProperties": false
+        }
+      ]
+    },
+
+    "hsForAllTelescope": {
+      "oneOf": [
+        {
+          "type": "object",
+          "description": "Visible forall (type-level, @->@)",
+          "properties": {
+            "tag": { "const": "HsForAllVis" },
+            "binders": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/tyVarBndr" }
+            }
+          },
+          "required": ["tag", "binders"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "description": "Invisible forall (term-level, @.@)",
+          "properties": {
+            "tag": { "const": "HsForAllInvis" },
+            "binders": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/tyVarBndr" }
+            }
+          },
+          "required": ["tag", "binders"],
+          "additionalProperties": false
+        }
+      ]
+    },
+
+    "tyVarBndr": {
+      "type": "object",
+      "description": "A type variable binder",
+      "properties": {
+        "name": { "$ref": "#/$defs/nameRef" },
+        "visibility": {
+          "type": "string",
+          "enum": ["Required", "Inferred", "Specified"]
+        },
+        "kind": {
+          "oneOf": [
+            { "$ref": "#/$defs/hsType" },
+            { "type": "null" }
+          ]
+        }
+      },
+      "required": ["name", "visibility"],
+      "additionalProperties": false
+    },
+
+    "hsTyLit": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "tag": { "const": "HsNumTy" },
+            "value": { "type": "integer" }
+          },
+          "required": ["tag", "value"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "tag": { "const": "HsStrTy" },
+            "value": { "type": "string" }
+          },
+          "required": ["tag", "value"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "tag": { "const": "HsCharTy" },
+            "value": { "type": "string" }
+          },
+          "required": ["tag", "value"],
+          "additionalProperties": false
+        }
+      ]
+    },
+
+    "tyFamInstEqn": {
+      "type": "object",
+      "description": "A type family instance equation",
+      "properties": {
+        "tyCon": { "$ref": "#/$defs/nameRef" },
+        "patterns": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/hsType" }
+        },
+        "rhs": { "$ref": "#/$defs/hsType" }
+      },
+      "required": ["tyCon", "patterns", "rhs"],
+      "additionalProperties": false
+    },
+
+    "booleanFormula": {
+      "description": "A boolean formula for minimal complete definitions",
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "tag": { "const": "Var" },
+            "name": { "$ref": "#/$defs/nameRef" }
+          },
+          "required": ["tag", "name"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "tag": { "const": "And" },
+            "formulas": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/booleanFormula" }
+            }
+          },
+          "required": ["tag", "formulas"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "tag": { "const": "Or" },
+            "formulas": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/booleanFormula" }
+            }
+          },
+          "required": ["tag", "formulas"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "tag": { "const": "Parens" },
+            "formula": { "$ref": "#/$defs/booleanFormula" }
+          },
+          "required": ["tag", "formula"],
+          "additionalProperties": false
+        }
+      ]
+    },
+
+    "fixity": {
+      "type": "object",
+      "properties": {
+        "precedence": { "type": "integer" },
+        "direction": {
+          "type": "string",
+          "enum": ["InfixL", "InfixR", "InfixN"]
+        }
+      },
+      "required": ["precedence", "direction"],
+      "additionalProperties": false
+    },
+
+    "docInstance": {
+      "type": "object",
+      "description": "A documented instance",
+      "properties": {
+        "instanceType": { "$ref": "#/$defs/instHead" },
+        "doc": {
+          "oneOf": [
+            { "$ref": "#/$defs/mDoc" },
+            { "type": "null" }
+          ]
+        },
+        "module": {
+          "oneOf": [
+            { "$ref": "#/$defs/moduleRef" },
+            { "type": "null" }
+          ]
+        },
+        "isOrphan": { "type": "boolean" }
+      },
+      "required": ["instanceType"],
+      "additionalProperties": false
+    },
+
+    "instHead": {
+      "type": "object",
+      "properties": {
+        "className": { "$ref": "#/$defs/nameRef" },
+        "types": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/hsType" }
+        },
+        "instanceType": {
+          "oneOf": [
+            {
+              "type": "object",
+              "description": "Class instance",
+              "properties": {
+                "tag": { "const": "ClassInst" },
+                "context": {
+                  "type": "array",
+                  "items": { "$ref": "#/$defs/hsType" }
+                },
+                "tyVars": {
+                  "type": "array",
+                  "items": { "$ref": "#/$defs/tyVarBndr" }
+                },
+                "sigs": {
+                  "type": "array",
+                  "items": { "$ref": "#/$defs/sigDecl" }
+                },
+                "associatedTypes": {
+                  "type": "array",
+                  "items": { "$ref": "#/$defs/familyDecl" }
+                }
+              },
+              "required": ["tag"],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "description": "Type family instance",
+              "properties": {
+                "tag": { "const": "TypeInst" },
+                "rhs": {
+                  "oneOf": [
+                    { "$ref": "#/$defs/hsType" },
+                    { "type": "null" }
+                  ]
+                }
+              },
+              "required": ["tag"],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "description": "Data family instance",
+              "properties": {
+                "tag": { "const": "DataInst" },
+                "constructors": {
+                  "type": "array",
+                  "items": { "$ref": "#/$defs/conDecl" }
+                }
+              },
+              "required": ["tag"],
+              "additionalProperties": false
+            }
+          ]
+        }
+      },
+      "required": ["className", "types", "instanceType"],
+      "additionalProperties": false
+    },
+
+    "documentation": {
+      "description": "Module-level documentation (body and optional warning)",
+      "type": "object",
+      "properties": {
+        "body": {
+          "oneOf": [
+            { "$ref": "#/$defs/mDoc" },
+            { "type": "null" }
+          ]
+        },
+        "warning": {
+          "oneOf": [
+            { "$ref": "#/$defs/doc" },
+            { "type": "null" }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+
+    "docForDecl": {
+      "description": "Documentation for a declaration (body and argument docs)",
+      "type": "object",
+      "properties": {
+        "body": {
+          "oneOf": [
+            { "$ref": "#/$defs/mDoc" },
+            { "type": "null" }
+          ]
+        },
+        "arguments": {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              { "$ref": "#/$defs/mDoc" },
+              { "type": "null" }
+            ]
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+
+    "mDoc": {
+      "description": "A documentation tree with metadata (@since annotation)",
+      "type": "object",
+      "properties": {
+        "meta": {
+          "type": "object",
+          "properties": {
+            "version": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "since": { "type": "string" }
+                  },
+                  "required": ["since"],
+                  "additionalProperties": false
+                },
+                { "type": "null" }
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        "doc": { "$ref": "#/$defs/doc" }
+      },
+      "required": ["meta", "doc"],
+      "additionalProperties": false
+    },
+
+    "doc": {
+      "description": "A Haddock DocH documentation markup tree",
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "tag": { "const": "DocEmpty" }
+          },
+          "required": ["tag"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "tag": { "const": "DocAppend" },
+            "first": { "$ref": "#/$defs/doc" },
+            "second": { "$ref": "#/$defs/doc" }
+          },
+          "required": ["tag", "first", "second"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "tag": { "const": "DocString" },
+            "string": { "type": "string" }
+          },
+          "required": ["tag", "string"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "tag": { "const": "DocParagraph" },
+            "document": { "$ref": "#/$defs/doc" }
+          },
+          "required": ["tag", "document"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "tag": { "const": "DocIdentifier" },
+            "name": { "$ref": "#/$defs/wrapName" }
+          },
+          "required": ["tag", "name"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "tag": { "const": "DocIdentifierUnchecked" },
+            "modName": {
+              "type": "object",
+              "properties": {
+                "moduleName": { "type": "string" },
+                "occName": { "type": "string" }
+              },
+              "required": ["moduleName", "occName"],
+              "additionalProperties": false
+            }
+          },
+          "required": ["tag", "modName"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "tag": { "const": "DocModule" },
+            "name": { "type": "string" },
+            "label": {
+              "oneOf": [
+                { "$ref": "#/$defs/doc" },
+                { "type": "null" }
+              ]
+            }
+          },
+          "required": ["tag", "name"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "tag": { "const": "DocWarning" },
+            "document": { "$ref": "#/$defs/doc" }
+          },
+          "required": ["tag", "document"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "tag": { "const": "DocEmphasis" },
+            "document": { "$ref": "#/$defs/doc" }
+          },
+          "required": ["tag", "document"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "tag": { "const": "DocBold" },
+            "document": { "$ref": "#/$defs/doc" }
+          },
+          "required": ["tag", "document"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "tag": { "const": "DocMonospaced" },
+            "document": { "$ref": "#/$defs/doc" }
+          },
+          "required": ["tag", "document"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "tag": { "const": "DocUnorderedList" },
+            "documents": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/doc" }
+            }
+          },
+          "required": ["tag", "documents"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "tag": { "const": "DocOrderedList" },
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "seq": { "type": "integer" },
+                  "document": { "$ref": "#/$defs/doc" }
+                },
+                "required": ["seq", "document"],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": ["tag", "items"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "tag": { "const": "DocDefList" },
+            "definitions": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "term": { "$ref": "#/$defs/doc" },
+                  "definition": { "$ref": "#/$defs/doc" }
+                },
+                "required": ["term", "definition"],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": ["tag", "definitions"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "tag": { "const": "DocCodeBlock" },
+            "document": { "$ref": "#/$defs/doc" }
+          },
+          "required": ["tag", "document"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "tag": { "const": "DocHyperlink" },
+            "url": { "type": "string" },
+            "label": {
+              "oneOf": [
+                { "$ref": "#/$defs/doc" },
+                { "type": "null" }
+              ]
+            }
+          },
+          "required": ["tag", "url"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "tag": { "const": "DocPic" },
+            "url": { "type": "string" },
+            "title": {
+              "oneOf": [
+                { "type": "string" },
+                { "type": "null" }
+              ]
+            }
+          },
+          "required": ["tag", "url"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "tag": { "const": "DocMathInline" },
+            "string": { "type": "string" }
+          },
+          "required": ["tag", "string"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "tag": { "const": "DocMathDisplay" },
+            "string": { "type": "string" }
+          },
+          "required": ["tag", "string"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "tag": { "const": "DocAName" },
+            "string": { "type": "string" }
+          },
+          "required": ["tag", "string"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "tag": { "const": "DocProperty" },
+            "string": { "type": "string" }
+          },
+          "required": ["tag", "string"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "tag": { "const": "DocExamples" },
+            "examples": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "expression": { "type": "string" },
+                  "result": {
+                    "type": "array",
+                    "items": { "type": "string" }
+                  }
+                },
+                "required": ["expression", "result"],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": ["tag", "examples"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "tag": { "const": "DocHeader" },
+            "level": { "type": "integer" },
+            "title": { "$ref": "#/$defs/doc" }
+          },
+          "required": ["tag", "level", "title"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "tag": { "const": "DocTable" },
+            "headerRows": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/tableRow" }
+            },
+            "bodyRows": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/tableRow" }
+            }
+          },
+          "required": ["tag", "headerRows", "bodyRows"],
+          "additionalProperties": false
+        }
+      ]
+    },
+
+    "tableRow": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/tableCell" }
+    },
+
+    "tableCell": {
+      "type": "object",
+      "properties": {
+        "colspan": { "type": "integer" },
+        "rowspan": { "type": "integer" },
+        "contents": { "$ref": "#/$defs/doc" }
+      },
+      "required": ["colspan", "rowspan", "contents"],
+      "additionalProperties": false
+    }
+  }
+}
